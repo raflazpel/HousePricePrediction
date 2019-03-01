@@ -198,27 +198,28 @@ clean_train = sum_Porch(clean_train)
 clean_train = sum_Baths(clean_train)
 
 
-# In[10]:
+# Save the feature engineered data
+clean_train.to_csv('training_FE_data.csv')
+clean_test.to_csv('test_FE_data.csv')
 
+# From here you can delete it and put it in a linear regression python file
+# TODO: Move rest of the code to other python file.
 
 X = clean_train.loc[:, clean_train.columns != 'SalePrice']
 y = clean_train.loc[:, 'SalePrice']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
     
 # Create linear regression object
-regr = linear_model.LinearRegression(n_jobs = 1)
+regr = linear_model.LinearRegression(n_jobs=1)
 
 regr.fit(X_train, y_train)
 print(regr)
 y_pred = regr.predict(X_test)
-
-# The coefficients
-# print('Coefficients: \n', regr.coef_)
     
 # The metrics
 
 print(stats.describe(regr.coef_))
-#print('Coefficients: \n', regr.coef_)
+
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mean_squared_error(np.log(y_test),np.log(y_pred)))
 r2 = r2_score(np.log(y_test), np.log(y_pred))
@@ -245,5 +246,5 @@ clean_test['SalePrice'] =  test_prediction
 submission = clean_test[['SalePrice']]
 submission.to_csv('FirstGroupSubmission.csv')
 print(submission)
- 
+
 clean_train.info()
