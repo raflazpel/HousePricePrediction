@@ -171,20 +171,13 @@ clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 
 # Feature engineering
-clean_train = drop_categories(clean_train)
-clean_test = drop_categories(clean_test)
+all_fe_functions = ['drop_categories', 'sum_SF', 'sum_Porch', 'sum_Baths', 'drop_empty_features', 'fix_skewness']
+fe_functions_only_for_training_set = ['fix_skewness']
 
-clean_test = sum_SF(clean_test)
-clean_test = sum_Porch(clean_test)
-clean_test = sum_Baths(clean_test)
-clean_test = drop_empty_features(clean_test)
-clean_train = sum_SF(clean_train)
-clean_train = sum_Porch(clean_train)
-clean_train = sum_Baths(clean_train)
-clean_train = drop_empty_features(clean_train)
-
-clean_train = fix_skewness(clean_train)
-
+for fe_function in all_fe_functions:
+    clean_train = globals()[fe_function](clean_train)
+    if fe_function not in fe_functions_only_for_training_set:
+        clean_test = globals()[fe_function](clean_test)
 
 # Save the feature engineered data
 clean_train.to_csv('training_FE_data.csv')
