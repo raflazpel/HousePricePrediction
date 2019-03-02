@@ -21,8 +21,75 @@ from scipy.stats import skew
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
 
-#F unctions
+############################
+# DATA PREPARATION FUNCTIONS
+############################
 
+
+def fill_na_values(df):
+    # Now we fill null-values
+    df['LotFrontage'].fillna(value=0, inplace=True)
+    df['MasVnrArea'].fillna(value=0, inplace=True)
+    df['BsmtFinSF1'].fillna(value=0, inplace=True)
+    df['BsmtFinSF2'].fillna(value=0, inplace=True)
+    df['BsmtUnfSF'].fillna(value=0, inplace=True)
+    df['TotalBsmtSF'].fillna(value=0, inplace=True)
+    df['BsmtFullBath'].fillna(value=0, inplace=True)
+    df['GarageArea'].fillna(value=0, inplace=True)
+    df['GarageCars'].fillna(value=0, inplace=True)
+    df['GarageArea'].fillna(value=0, inplace=True)
+    df['BsmtHalfBath'].fillna(value=0, inplace=True)
+    df['GarageYrBlt'].fillna(df['GarageYrBlt'].median(), inplace=True)
+    return df
+
+
+def one_hot_encode(df):
+    for col in ['MSSubClass', 'MSZoning', 'Street', 'LotShape', 'MSZoning', 'LandContour', 'Utilities',
+                'LotConfig', 'LandSlope', 'Neighborhood', 'Condition1', 'Condition2', 'BldgType', 'HouseStyle', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd',
+                'MasVnrType', 'ExterQual', 'ExterCond', 'Foundation', 'BsmtQual', 'BsmtCond',
+                'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Heating', 'HeatingQC', 'CentralAir', 'Electrical',
+                'KitchenQual', 'Functional', 'FireplaceQu', 'GarageType', 'GarageFinish', 'GarageQual',
+                'GarageCond', 'PavedDrive', 'SaleType', 'SaleCondition']:
+        if col in df.columns:
+            df[col] = df[col].astype('category')
+
+    # Apply one-hot-enconding to all categorical variables.
+    # Suponemos que todas las variables categoricas son nominales. Se puede aplicar integer-encoding
+    # a las que sean ordinales.
+    categorical_columns = df.select_dtypes(include='category').columns.tolist()
+
+    for categoricalVariable in categorical_columns:
+        dummy = pd.get_dummies(df[categoricalVariable], prefix=categoricalVariable).astype('category')
+        df = pd.concat([df, dummy], axis=1)
+        df.drop([categoricalVariable], axis=1, inplace=True)
+
+    return df
+
+
+def merge_one_hot_encoded_columns(train_df, test_df):
+    """
+    After one-hot encoding, some columns might exist in the train dataset and not in the test one, or viceversa.
+    If a column exists in one of the two dataframes and not in the other, we create it and fill it with zeros.
+    """
+    clean_test_set = set(list(test_df.columns.values))
+    clean_train_set = set(list(train_df.columns.values))
+
+    differences = list(clean_test_set ^ clean_train_set)
+    differences.remove('SalePrice')
+
+    for dif in differences:
+        if dif not in train_df:
+            train_df[dif] = 0
+            train_df[dif] = train_df[dif].astype('category')
+        if dif not in test_df:
+            test_df[dif] = 0
+            test_df[dif] = test_df[dif].astype('category')
+    return train_df, test_df
+
+
+###############################
+# FEATURE ENGINEERING FUNCTIONS
+###############################
 
 def sum_SF(df):
     columns_to_add = ['1stFlrSF', '2ndFlrSF', 'BsmtFinSF1', 'BsmtFinSF2']
@@ -59,143 +126,64 @@ def feature_skewness(df):
 
 def fix_skewness(df):
     feature_skew, numeric_features = feature_skewness(df)
-    print(feature_skew)
-    print(numeric_features)
     high_skew = feature_skew[feature_skew > 0.9]
     skew_index = high_skew.index
-    print(high_skew)
     for i in skew_index:
         df[i] = boxcox1p(df[i], boxcox_normmax(df[i]+1))
 
-    skew_features = df[numeric_features].apply(lambda x: skew(x)).sort_values(ascending=False)
-    skews = pd.DataFrame({'skew':skew_features})
-    print(skews)
+    #skew_features = df[numeric_features].apply(lambda x: skew(x)).sort_values(ascending=False)
+    #skews = pd.DataFrame({'skew':skew_features})
     return df
 
 
-def clean_data(df):
-    # Change the index and drop almost empty variables.
-    df = df.set_index('Id')
+def drop_empty_features(df):
+    """
+    Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
+    """
     df.drop(['Alley', 'PoolQC', 'Fence', 'MiscFeature'], axis=1, inplace=True)
-         
-    # Now I want to mark the categorical variables.
+    return df
 
-    # Strategy 1: Almost all non-numeric variables are categorical,
-    # so I find them and mark them as categorical
 
-    # Second step would be to find all the features that are numerical-categorical columns and mark them
-    # (Because we already marked non-numerical.
-    # In this case I have done it manually with ALL categorical columns
-
-    # Modificacion: Submission 7: hemos pasado Overall Qal y cond a no categor
-    for col in ['MSSubClass', 'MSZoning', 'Street', 'LotShape', 'MSZoning', 'LandContour', 'Utilities',
-                'LotConfig', 'LandSlope', 'Neighborhood', 'Condition1', 'Condition2', 'BldgType', 'HouseStyle', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd',
-                'MasVnrType', 'ExterQual', 'ExterCond', 'Foundation', 'BsmtQual', 'BsmtCond',
-                'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Heating', 'HeatingQC', 'CentralAir', 'Electrical',
-                'KitchenQual', 'Functional', 'FireplaceQu', 'GarageType', 'GarageFinish', 'GarageQual',
-                'GarageCond', 'PavedDrive', 'SaleType', 'SaleCondition']:
-         df[col] = df[col].astype('category')
-    # Apply one-hot-enconding to all categorical variables.
-    # Suponemos que todas las variables categoricas son nominales. Se puede aplicar integer-encoding
-    # a las que sean ordinales.
+def drop_categories(df):
     categorical_columns = df.select_dtypes(include='category').columns.tolist()
 
     for categoricalVariable in categorical_columns:
-        dummy = pd.get_dummies(df[categoricalVariable], prefix=categoricalVariable).astype('category')
-        df = pd.concat([df, dummy], axis=1)
-        df.drop([categoricalVariable], axis=1, inplace=True)
-
-    # Now we fill null-values
-    df['LotFrontage'].fillna(value=0, inplace=True)
-    df['MasVnrArea'].fillna(value=0, inplace=True)
-    df['BsmtFinSF1'].fillna(value=0, inplace=True)
-    df['BsmtFinSF2'].fillna(value=0, inplace=True)
-    df['BsmtUnfSF'].fillna(value=0, inplace=True)
-    df['TotalBsmtSF'].fillna(value=0, inplace=True)
-    df['BsmtFullBath'].fillna(value=0, inplace=True)
-    df['GarageArea'].fillna(value=0, inplace=True)
-    df['GarageCars'].fillna(value=0, inplace=True)
-    df['GarageArea'].fillna(value=0, inplace=True)
-    df['BsmtHalfBath'].fillna(value=0, inplace=True)
-    df['GarageYrBlt'].fillna(df['GarageYrBlt'].median(), inplace=True)
+        if categoricalVariable not in ['ExterQual_Ex', 'ExterQual_Gd', 'ExterQual_TA', 'ExterQual_Fa', 'ExterQual_Po',
+                                       'KitchenQual_Ex', 'KitchenQual_Gd', 'KitchenQual_TA', 'KitchenQual_Fa',
+                                       'KitchenQual_Po']:
+            df.drop([categoricalVariable], axis=1, inplace=True)
 
     return df
 
 
 # Load the dataset.
-train = pd.read_csv('train.csv')
-test = pd.read_csv('test.csv')
+train = pd.read_csv('train.csv').set_index('Id')
+test = pd.read_csv('test.csv').set_index('Id')
 
 # Allow info in bigger dataframes
 pd.options.display.max_info_columns = 350
 
 
-# Este bloque deja los datasets limpios y listos para f.e
-
-clean_train = clean_data(train)
-clean_train['MSSubClass_150'] = 0
-clean_train['MSSubClass_150'] = clean_train['MSSubClass_150'].astype('category')
-clean_test = clean_data(test)
+# Data preparation
+clean_train = one_hot_encode(fill_na_values(train))
+clean_test = one_hot_encode(fill_na_values(test))
+clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 
-clean_test_set = set(list(clean_test.columns.values))
-
-clean_train_set = set(list(clean_train.columns.values))
-
-differences = list(clean_test_set ^ clean_train_set)
-differences.remove('SalePrice')
-print(differences)
-
-for dif in differences:
-    clean_test[dif] = 0
-    clean_test[dif] = clean_test[dif].astype('category')
-
-
-# In[5]:
-
-
-# Modificación 1: Solo variables no-categoricas. (Submission 4)
-'''print(clean_test.select_dtypes(include='category').columns)
-
-def drop_categories(df):
-    
-    categorical_columns = df.select_dtypes(include='category').columns.tolist()
-
-    for categoricalVariable in categorical_columns:
-        df.drop([categoricalVariable], axis=1, inplace=True)
-    
-    return df
-
+# Feature engineering
 clean_train = drop_categories(clean_train)
 clean_test = drop_categories(clean_test)
-
-'''
-
-# Modificación 2: Sobre la modificación 1 metemos algunas variables categoricas (Submission 5)
-
-
-def drop_categories(df):
-    categorical_columns = df.select_dtypes(include='category').columns.tolist()
-
-    for categoricalVariable in categorical_columns:
-        if categoricalVariable not in ['ExterQual_Ex', 'ExterQual_Gd', 'ExterQual_TA', 'ExterQual_Fa', 'ExterQual_Po', 'KitchenQual_Ex','KitchenQual_Gd','KitchenQual_TA','KitchenQual_Fa','KitchenQual_Po']:
-            df.drop([categoricalVariable], axis=1, inplace=True)
-    
-    return df
-
-
-print(clean_test.select_dtypes(include='category').columns)
-clean_train = drop_categories(clean_train)
-clean_test = drop_categories(clean_test)
-print(clean_test.select_dtypes(include='category').columns)
-
 
 clean_test = sum_SF(clean_test)
 clean_test = sum_Porch(clean_test)
 clean_test = sum_Baths(clean_test)
+clean_test = drop_empty_features(clean_test)
 clean_train = sum_SF(clean_train)
 clean_train = sum_Porch(clean_train)
 clean_train = sum_Baths(clean_train)
+clean_train = drop_empty_features(clean_train)
+
+clean_train = fix_skewness(clean_train)
 
 
 # Save the feature engineered data
@@ -213,18 +201,18 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random
 regr = linear_model.LinearRegression(n_jobs=1)
 
 regr.fit(X_train, y_train)
-print(regr)
 y_pred = regr.predict(X_test)
     
 # The metrics
 
-print(stats.describe(regr.coef_))
+#print(stats.describe(regr.coef_))
 
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mean_squared_error(np.log(y_test),np.log(y_pred)))
 r2 = r2_score(np.log(y_test), np.log(y_pred))
-print(r2)
-print(rmse)
+print(" sklearn score: {}".format(regr.score(X_test, y_test)))
+print("r2 {}".format(r2))
+print("rmse {}".format(rmse))
 
 # Reentrenar con datos de validacion y cargar en csv
 regr2 = linear_model.LinearRegression()
@@ -245,6 +233,5 @@ clean_test['SalePrice'] =  test_prediction
 
 submission = clean_test[['SalePrice']]
 submission.to_csv('FirstGroupSubmission.csv')
-print(submission)
 
-clean_train.info()
+#clean_train.info()
