@@ -190,11 +190,16 @@ def add_expensive_neighborhood_feature(df):
     """
     expensive_neighborhoods = ['Neighborhood_NoRidge', 'Neighborhood_NridgHt', 'Neighborhood_StoneBr',
                                'Neighborhood_Somerst', 'Neighborhood_Crawfor']
+
     for neighborhood in expensive_neighborhoods:
         df.loc[df[neighborhood] == 1, "Expensive_Neighborhood"] = 1
     df["Expensive_Neighborhood"].fillna(0, inplace=True)
     df.drop([col for col in df if col.startswith('Neighborhood')], axis=1, inplace=True, errors="ignore")
     return df
+
+
+def remove_too_cheap_outliers(df):
+    return df[df["SalePrice"] > 50000]
 
 
 def drop_empty_features(df):
@@ -236,10 +241,10 @@ clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 # Feature engineering
-all_fe_functions = ['add_expensive_neighborhood_feature',
+all_fe_functions = ['remove_too_cheap_outliers', 'add_expensive_neighborhood_feature', 
                     'transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'fix_skewness']
-fe_functions_only_for_training_set = ['fix_skewness']
+fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
 
 for fe_function in all_fe_functions:
     clean_train = globals()[fe_function](clean_train)
