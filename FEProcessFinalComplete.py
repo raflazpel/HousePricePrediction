@@ -182,6 +182,21 @@ def transform_sales_to_log_of_sales(df):
         df['SalePrice'] = df['SalePrice'].apply(np.log1p)
     return df
 
+
+def add_expensive_neighborhood_feature(df):
+    """
+    Instead of using all the neighborhoods, we use a binary classification: are they located in one of the 5 most
+    expensive neighborhoods?
+    """
+    expensive_neighborhoods = ['Neighborhood_NoRidge', 'Neighborhood_NridgHt', 'Neighborhood_StoneBr',
+                               'Neighborhood_Somerst', 'Neighborhood_Crawfor']
+    for neighborhood in expensive_neighborhoods:
+        df.loc[df[neighborhood] == 1, "Expensive_Neighborhood"] = 1
+    df["Expensive_Neighborhood"].fillna(0, inplace=True)
+    df.drop([col for col in df if col.startswith('Neighborhood')], axis=1, inplace=True, errors="ignore")
+    return df
+
+
 def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
@@ -221,7 +236,8 @@ clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 # Feature engineering
-all_fe_functions = ['transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
+all_fe_functions = ['add_expensive_neighborhood_feature',
+                    'transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'fix_skewness']
 fe_functions_only_for_training_set = ['fix_skewness']
 
