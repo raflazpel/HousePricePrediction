@@ -1,2 +1,2 @@
 # This is a hello world test file.
-print('Hello world')
+print('Hello world test')
