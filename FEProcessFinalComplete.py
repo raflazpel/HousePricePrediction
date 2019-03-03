@@ -10,7 +10,7 @@
 # 
 # As we are performing F.E the only rule will be not to change the prediction model built at the professor's notebook.
 
-# Import necesary packages.
+# Import necessary packages.
 import numpy as np
 import pandas as pd
 from sklearn import linear_model
@@ -20,6 +20,7 @@ from sklearn.feature_selection import SelectKBest, f_regression
 from scipy.stats import skew
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
+from itertools import combinations
 
 ############################
 # DATA PREPARATION FUNCTIONS
@@ -43,14 +44,16 @@ def fill_na_values(df):
     return df
 
 
-def one_hot_encode(df):
-    for col in ['MSSubClass', 'MSZoning', 'Street', 'LotShape', 'MSZoning', 'LandContour', 'Utilities',
+def one_hot_encode(df, skip_features=[]):
+    for col in [
+                'Alley', 'PoolQC', 'Fence', 'MiscFeature',
+                'MSSubClass', 'MSZoning', 'Street', 'LotShape', 'MSZoning', 'LandContour', 'Utilities',
                 'LotConfig', 'LandSlope', 'Neighborhood', 'Condition1', 'Condition2', 'BldgType', 'HouseStyle', 'RoofStyle', 'RoofMatl', 'Exterior1st', 'Exterior2nd',
                 'MasVnrType', 'ExterQual', 'ExterCond', 'Foundation', 'BsmtQual', 'BsmtCond',
                 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2', 'Heating', 'HeatingQC', 'CentralAir', 'Electrical',
                 'KitchenQual', 'Functional', 'FireplaceQu', 'GarageType', 'GarageFinish', 'GarageQual',
                 'GarageCond', 'PavedDrive', 'SaleType', 'SaleCondition']:
-        if col in df.columns:
+        if col in df.columns and col not in skip_features:
             df[col] = df[col].astype('category')
 
     # Apply one-hot-enconding to all categorical variables.
@@ -285,26 +288,11 @@ def drop_categories(df):
     return df
 
 
-# Load the dataset.
-train = pd.read_csv('train.csv').set_index('Id')
-test = pd.read_csv('test.csv').set_index('Id')
-
-#print(train['ExterCond'].isnull().values.any())
-#print(train[train['PoolQC'].isnull()]['PoolQC'])
-
-#exit(0)
-
-# Allow info in bigger dataframes
-pd.options.display.max_info_columns = 350
+########################
+# MAIN
+########################
 
 
-# Data preparation
-clean_train = one_hot_encode(fill_na_values(train))
-clean_test = one_hot_encode(fill_na_values(test))
-clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
-
-
-# Feature engineering
 all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel',
                     'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'remove_garage_cars_feature', 'remove_lotfrontage_feature', 'drop_categories',
@@ -316,63 +304,94 @@ fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers
 dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso',
                                        'f_regression_feature_filtering']
 
-for fe_function in all_fe_functions:
-    clean_train = globals()[fe_function](clean_train)
-    if fe_function in fe_functions_only_for_training_set:
+
+for number_functions_to_run in range(1, len(all_fe_functions) + 1):
+    for functions in combinations(all_fe_functions, number_functions_to_run):
+        print(" starting functions {}".format(functions))
+        # Load data set
+        train = pd.read_csv('train.csv').set_index('Id')
+        test = pd.read_csv('test.csv').set_index('Id')
+
+        # Allow info in bigger dataframes
+        pd.options.display.max_info_columns = 350
+
+        # in some cases, there are specific features that we do not want to one-hot encode
+        skip_one_hot_encode_features = []
+        if 'categorical_to_ordinal' in functions:
+            skip_one_hot_encode_features = ['PoolQC']
+
+
+        # Data preparation
+        clean_train = one_hot_encode(fill_na_values(train))
+        clean_test = one_hot_encode(fill_na_values(test))
+        clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
+
+        # Feature engineering
+        for fe_function in functions:
+            clean_train = globals()[fe_function](clean_train)
+            if fe_function in fe_functions_only_for_training_set:
+                continue
+            elif fe_function in dynamic_feature_selection_functions:
+                # some functions remove features dynamically, we need to apply the same changes to the test data set
+                clean_test = clean_test[clean_train.drop('SalePrice', axis=1).columns]
+            else:
+                clean_test = globals()[fe_function](clean_test)
+
+        # TODO uncomment
+        # Save the feature engineered data
+        # clean_train.to_csv('training_FE_data.csv')
+        # clean_test.to_csv('test_FE_data.csv')
+
+        # From here you can delete it and put it in a linear regression python file
+        # TODO: Move rest of the code to other python file.
+
+        X = clean_train.loc[:, clean_train.columns != 'SalePrice']
+        y = clean_train.loc[:, 'SalePrice']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
+
+        # Create linear regression object
+        regr = linear_model.LinearRegression(n_jobs=1)
+
+        regr.fit(X_train, y_train)
+        print("functions : {0}, score; {1}".format(functions, regr.score(X_test, y_test)))
+        # TODO uncomment
+        #y_pred = regr.predict(X_test)
+
+        # The metrics
+
+        # print(stats.describe(regr.coef_))
+        # mse = mean_squared_error(y_test, y_pred)
+        # rmse = np.sqrt(mean_squared_error(np.log(y_test), np.log(y_pred)))
+        # r2 = r2_score(np.log(y_test), np.log(y_pred))
+        # print(" FUNCTIONS : {}".format(functions))
+        # print(" sklearn score: {}".format(regr.score(X_test, y_test)))
+        # print("r2 {}".format(r2))
+        # print("rmse {}".format(rmse))
+
+        # TODO remove this continue (by now, don't want to predict for kaggle yet)
         continue
-    elif fe_function in dynamic_feature_selection_functions:
-        # some functions remove features dynamically, we need to apply the same changes to the test data set
-        clean_test = clean_test[clean_train.drop('SalePrice', axis=1).columns]
-    else:
-        clean_test = globals()[fe_function](clean_test)
+        # Reentrenar con datos de validacion y cargar en csv
+        regr2 = linear_model.LinearRegression()
+        regr2.fit(X, y)
+        '''
+        test_prediction = regr2.predict(clean_test)
+        clean_test['SalePrice'] = test_prediction
 
 
-# Save the feature engineered data
-clean_train.to_csv('training_FE_data.csv')
-clean_test.to_csv('test_FE_data.csv')
+        submission = clean_test[['SalePrice']]
+        submission.to_csv('Submission9-RETRAINED.csv')
+        print(submission)
 
-# From here you can delete it and put it in a linear regression python file
-# TODO: Move rest of the code to other python file.
+        '''
+        test_prediction = regr.predict(clean_test)
 
-X = clean_train.loc[:, clean_train.columns != 'SalePrice']
-y = clean_train.loc[:, 'SalePrice']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-    
-# Create linear regression object
-regr = linear_model.LinearRegression(n_jobs=1)
+        # if SalePrice has been log-transformed, we must carry out the inverse operation (exp)
+        if 'transform_sales_to_log_of_sales' in functions:
+            test_prediction= np.expm1(test_prediction)
 
-regr.fit(X_train, y_train)
-y_pred = regr.predict(X_test)
-    
-# The metrics
+        clean_test['SalePrice'] = test_prediction
 
-#print(stats.describe(regr.coef_))
+        submission = clean_test[['SalePrice']]
+        submission.to_csv('FirstGroupSubmission.csv')
 
-mse = mean_squared_error(y_test, y_pred)
-rmse = np.sqrt(mean_squared_error(np.log(y_test),np.log(y_pred)))
-r2 = r2_score(np.log(y_test), np.log(y_pred))
-print(" sklearn score: {}".format(regr.score(X_test, y_test)))
-print("r2 {}".format(r2))
-print("rmse {}".format(rmse))
-
-# Reentrenar con datos de validacion y cargar en csv
-regr2 = linear_model.LinearRegression()
-regr2.fit(X, y)
-'''
-test_prediction = regr2.predict(clean_test)
-clean_test['SalePrice'] = test_prediction
-
-
-submission = clean_test[['SalePrice']]
-submission.to_csv('Submission9-RETRAINED.csv')
-print(submission)
-
-'''
-test_prediction = regr.predict(clean_test)
-clean_test['SalePrice'] =  test_prediction
-
-
-submission = clean_test[['SalePrice']]
-submission.to_csv('FirstGroupSubmission.csv')
-
-#clean_train.info()
+exit(0)
