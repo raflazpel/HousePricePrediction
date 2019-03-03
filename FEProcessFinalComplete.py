@@ -202,6 +202,19 @@ def remove_too_cheap_outliers(df):
     return df[df["SalePrice"] > 50000]
 
 
+def remove_garage_cars_feature(df):
+    """
+    'GarageCars' feature is related to GarageArea feature, it might be interesting to remove it
+    """
+    df.drop(['GarageCars'], axis=1, inplace=True)
+    return df
+
+
+def remove_lotfrontage_feature(df):
+    df.drop(['LotFrontage'], axis=1, inplace=True)
+    return df
+
+
 def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
@@ -241,7 +254,8 @@ clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 # Feature engineering
-all_fe_functions = ['remove_too_cheap_outliers', 'add_expensive_neighborhood_feature', 
+all_fe_functions = ['remove_lotfrontage_feature',
+                    'remove_garage_cars_feature', 'remove_too_cheap_outliers', 'add_expensive_neighborhood_feature',
                     'transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'fix_skewness']
 fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
