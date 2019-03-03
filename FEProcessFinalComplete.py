@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
-from scipy import stats
+from sklearn.feature_selection import SelectKBest, f_regression
 from scipy.stats import skew
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
@@ -243,9 +243,9 @@ def remove_under_represented_features(df):
         zeros = counts.iloc[0]
         if ((zeros / len(df)) * 100) > 99.0:
             under_rep.append(i)
-    not_dropped_features = set(df.columns) - set(under_rep)
+    #not_dropped_features = set(df.columns) - set(under_rep)
     df.drop(under_rep, axis=1, inplace=True)
-    return not_dropped_features, df
+    return df
 
 
 def feature_selection_lasso(df):
@@ -257,10 +257,21 @@ def feature_selection_lasso(df):
     y = df.SalePrice.reset_index(drop=True)
     clf.fit(X,y)
     zero_indexes = np.where(clf.coef_ == 0)[0]
-    not_dropped_features = set(df.columns) - set(zero_indexes)
+    #not_dropped_features = set(df.columns) - set(zero_indexes)
     df.drop(X.columns[zero_indexes], axis=1, inplace=True)
-    return not_dropped_features, df
+    return df
 
+
+def f_regression_feature_filtering(df):
+    """
+    Select the 18 best features to the target using f-test regression
+    (https://scikit-learn.org/stable/modules/generated/sklearn.feature_selection.f_regression.html#sklearn.feature_selection.f_regression)
+    """
+    X = df.drop(['SalePrice'], axis=1)
+    y = df.SalePrice.reset_index(drop=True)
+    best_features_indexes = SelectKBest(k=18, score_func=f_regression).fit(X, y).get_support(indices=True)
+    filtered_features = df.filter(items=X.columns[best_features_indexes], axis=1)
+    return filtered_features.join(df.SalePrice)
 
 def drop_categories(df):
     categorical_columns = df.select_dtypes(include='category').columns.tolist()
@@ -300,21 +311,21 @@ all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'a
                     'remove_too_cheap_outliers',
                     'categorical_to_ordinal',
                     'transform_sales_to_log_of_sales', 'fix_skewness',
-                    'feature_selection_lasso', 'remove_under_represented_features']
+                    'f_regression_feature_filtering', 'feature_selection_lasso', 'remove_under_represented_features']
 fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
-dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso']
+dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso',
+                                       'f_regression_feature_filtering']
 
 for fe_function in all_fe_functions:
-    if fe_function in dynamic_feature_selection_functions:
+    clean_train = globals()[fe_function](clean_train)
+    if fe_function in fe_functions_only_for_training_set:
+        continue
+    elif fe_function in dynamic_feature_selection_functions:
         # some functions remove features dynamically, we need to apply the same changes to the test data set
-        remaining_features, clean_train = globals()[fe_function](clean_train)
-        remaining_features.remove('SalePrice')
-        clean_test = clean_test[remaining_features]
-
+        clean_test = clean_test[clean_train.drop('SalePrice', axis=1).columns]
     else:
-        clean_train = globals()[fe_function](clean_train)
-        if fe_function not in fe_functions_only_for_training_set:
-            clean_test = globals()[fe_function](clean_test)
+        clean_test = globals()[fe_function](clean_test)
+
 
 # Save the feature engineered data
 clean_train.to_csv('training_FE_data.csv')
