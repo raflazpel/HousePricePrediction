@@ -207,6 +207,7 @@ def add_years_since_last_remodel(df):
     df['YearsSinceLastRemodel'] = df['YrSold'].astype(int) - df['YearRemodAdd'].astype(int)
     return df
 
+
 def remove_too_cheap_outliers(df):
     return df[df["SalePrice"] > 50000]
 
@@ -223,6 +224,7 @@ def remove_lotfrontage_feature(df):
     df.drop(['LotFrontage'], axis=1, inplace=True)
     return df
 
+
 def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
@@ -232,6 +234,9 @@ def drop_empty_features(df):
 
 
 def remove_under_represented_features(df):
+    """
+    Eliminate those columns with most of the information belonging to the same class
+    """
     under_rep = []
     for i in df.columns:
         counts = df[i].value_counts()
@@ -240,6 +245,20 @@ def remove_under_represented_features(df):
             under_rep.append(i)
     not_dropped_features = set(df.columns) - set(under_rep)
     df.drop(under_rep, axis=1, inplace=True)
+    return not_dropped_features, df
+
+
+def feature_selection_lasso(df):
+    """
+    Use Lasso to select the most meaningful features
+    """
+    clf = linear_model.Lasso(alpha=0.01)
+    X = df.drop(['SalePrice'], axis=1)
+    y = df.SalePrice.reset_index(drop=True)
+    clf.fit(X,y)
+    zero_indexes = np.where(clf.coef_ == 0)[0]
+    not_dropped_features = set(df.columns) - set(zero_indexes)
+    df.drop(X.columns[zero_indexes], axis=1, inplace=True)
     return not_dropped_features, df
 
 
@@ -281,9 +300,9 @@ all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'a
                     'remove_too_cheap_outliers',
                     'categorical_to_ordinal',
                     'transform_sales_to_log_of_sales', 'fix_skewness',
-                    'remove_under_represented_features']
+                    'feature_selection_lasso', 'remove_under_represented_features']
 fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
-dynamic_feature_selection_functions = ['remove_under_represented_features']
+dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso']
 
 for fe_function in all_fe_functions:
     if fe_function in dynamic_feature_selection_functions:
