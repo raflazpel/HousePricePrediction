@@ -174,6 +174,14 @@ def categorical_to_ordinal(df):
     return df
 
 
+def transform_sales_to_log_of_sales(df):
+    """
+    Our target values distribution get closer to a normal distribution using the log-transformation
+    """
+    if 'SalePrice' in df:
+        df['SalePrice'] = df['SalePrice'].apply(np.log1p)
+    return df
+
 def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
@@ -213,7 +221,8 @@ clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 # Feature engineering
-all_fe_functions = ['drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths', 'drop_empty_features', 'fix_skewness']
+all_fe_functions = ['transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
+                    'drop_empty_features', 'fix_skewness']
 fe_functions_only_for_training_set = ['fix_skewness']
 
 for fe_function in all_fe_functions:
