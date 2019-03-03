@@ -142,6 +142,38 @@ def fix_skewness(df):
     return df
 
 
+def categorical_to_ordinal(df):
+    """
+    Some textual features(e.g.basement quality) should be handled as numerical (i.e.ordinal) values
+    """
+
+    ordinal_features = ['ExterQual', 'BsmtQual', 'HeatingQC', 'KitchenQual', 'FireplaceQu', 'GarageQual', 'PoolQC',
+                        'ExterCond', 'BsmtCond', 'GarageCond']
+    for ordinalFeature in ordinal_features:
+        if ordinalFeature in df:
+            df[ordinalFeature].fillna(value=0, inplace=True)
+            df[ordinalFeature] = df[ordinalFeature].replace({
+                                            'Ex': 5,
+                                            'Gd': 4,
+                                            'TA': 3,
+                                            'Fa': 2,
+                                            'Po': 1,
+                                            'NA': 0
+                                            }).astype('int32')
+    if 'Foundation' in df:
+        df['Foundation'].fillna(value=0, inplace=True)
+        df['Foundation'] = df['Foundation'].replace({
+                                            'PConc': 3,
+                                            'CBlock': 2,
+                                            'BrkTil': 1,
+                                            'Slab': 0,
+                                            'Stone': 0,
+                                            'Wood': 0,
+                                            'NA': 0
+                                            }).astype('int32')
+    return df
+
+
 def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
@@ -166,6 +198,11 @@ def drop_categories(df):
 train = pd.read_csv('train.csv').set_index('Id')
 test = pd.read_csv('test.csv').set_index('Id')
 
+#print(train['ExterCond'].isnull().values.any())
+#print(train[train['PoolQC'].isnull()]['PoolQC'])
+
+#exit(0)
+
 # Allow info in bigger dataframes
 pd.options.display.max_info_columns = 350
 
@@ -175,9 +212,8 @@ clean_train = one_hot_encode(fill_na_values(train))
 clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
-
 # Feature engineering
-all_fe_functions = ['drop_categories', 'sum_SF', 'sum_Porch', 'sum_Baths', 'drop_empty_features', 'fix_skewness']
+all_fe_functions = ['drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths', 'drop_empty_features', 'fix_skewness']
 fe_functions_only_for_training_set = ['fix_skewness']
 
 for fe_function in all_fe_functions:
