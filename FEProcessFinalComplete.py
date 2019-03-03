@@ -13,6 +13,7 @@
 # Import necessary packages.
 import numpy as np
 import pandas as pd
+import datetime as datetime
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -305,6 +306,11 @@ dynamic_feature_selection_functions = ['remove_under_represented_features', 'fea
                                        'f_regression_feature_filtering']
 
 
+# start logging results
+results = []
+with open("results/results_fe.txt", "a") as file:
+    file.write("\n\n\n **** Started loggin at {} \n".format(datetime.datetime.now()))
+
 for number_functions_to_run in range(1, len(all_fe_functions) + 1):
     for functions in combinations(all_fe_functions, number_functions_to_run):
         print(" starting functions {}".format(functions))
@@ -353,11 +359,10 @@ for number_functions_to_run in range(1, len(all_fe_functions) + 1):
         regr = linear_model.LinearRegression(n_jobs=1)
 
         regr.fit(X_train, y_train)
-        print("functions : {0}, score; {1}".format(functions, regr.score(X_test, y_test)))
-        # TODO uncomment
-        #y_pred = regr.predict(X_test)
+        y_pred = regr.predict(X_test)
 
         # The metrics
+        score = r2_score(y_test, y_pred)
 
         # print(stats.describe(regr.coef_))
         # mse = mean_squared_error(y_test, y_pred)
@@ -367,6 +372,24 @@ for number_functions_to_run in range(1, len(all_fe_functions) + 1):
         # print(" sklearn score: {}".format(regr.score(X_test, y_test)))
         # print("r2 {}".format(r2))
         # print("rmse {}".format(rmse))
+
+        # keep track of results so far
+        string_result = "functions : {0}, r^2 score; {1}".format(functions, score)
+        print("\n")
+        print(string_result)
+        with open("results/results_fe.txt", "a") as file:
+            file.write(string_result + "\n")
+        results.append((functions, score))
+        results.sort(key=lambda tup: tup[1], reverse=True)
+        with open("results/sorted_results_fe.txt", "w") as file:
+            file.write("Sorted result at ")
+            file.write(str(datetime.datetime.now()))
+            file.write("\n")
+            file.write(str(results))
+
+            #file.write(" Sorted result at { }".format(datetime.datetime.now()))
+            #file.write(str(results))
+
 
         # TODO remove this continue (by now, don't want to predict for kaggle yet)
         continue
