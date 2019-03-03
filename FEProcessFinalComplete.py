@@ -198,6 +198,15 @@ def add_expensive_neighborhood_feature(df):
     return df
 
 
+def add_home_quality(df):
+    df['HomeQuality'] = df['OverallQual'] + df['OverallCond']
+    return df
+
+
+def add_years_since_last_remodel(df):
+    df['YearsSinceLastRemodel'] = df['YrSold'].astype(int) - df['YearRemodAdd'].astype(int)
+    return df
+
 def remove_too_cheap_outliers(df):
     return df[df["SalePrice"] > 50000]
 
@@ -213,7 +222,6 @@ def remove_garage_cars_feature(df):
 def remove_lotfrontage_feature(df):
     df.drop(['LotFrontage'], axis=1, inplace=True)
     return df
-
 
 def drop_empty_features(df):
     """
@@ -254,7 +262,7 @@ clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
 # Feature engineering
-all_fe_functions = ['remove_lotfrontage_feature',
+all_fe_functions = ['remove_lotfrontage_feature', 'add_home_quality', 'add_years_since_last_remodel',
                     'remove_garage_cars_feature', 'remove_too_cheap_outliers', 'add_expensive_neighborhood_feature',
                     'transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'fix_skewness']
