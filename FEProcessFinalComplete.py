@@ -231,6 +231,18 @@ def drop_empty_features(df):
     return df
 
 
+def remove_under_represented_features(df):
+    under_rep = []
+    for i in df.columns:
+        counts = df[i].value_counts()
+        zeros = counts.iloc[0]
+        if ((zeros / len(df)) * 100) > 99.0:
+            under_rep.append(i)
+    not_dropped_features = set(df.columns) - set(under_rep)
+    df.drop(under_rep, axis=1, inplace=True)
+    return not_dropped_features, df
+
+
 def drop_categories(df):
     categorical_columns = df.select_dtypes(include='category').columns.tolist()
 
@@ -261,17 +273,29 @@ clean_train = one_hot_encode(fill_na_values(train))
 clean_test = one_hot_encode(fill_na_values(test))
 clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
 
+
 # Feature engineering
-all_fe_functions = ['remove_lotfrontage_feature', 'add_home_quality', 'add_years_since_last_remodel',
-                    'remove_garage_cars_feature', 'remove_too_cheap_outliers', 'add_expensive_neighborhood_feature',
-                    'transform_sales_to_log_of_sales', 'drop_categories', 'categorical_to_ordinal', 'sum_SF', 'sum_Porch', 'sum_Baths',
-                    'drop_empty_features', 'fix_skewness']
+all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel',
+                    'sum_SF', 'sum_Porch', 'sum_Baths',
+                    'drop_empty_features', 'remove_garage_cars_feature', 'remove_lotfrontage_feature', 'drop_categories',
+                    'remove_too_cheap_outliers',
+                    'categorical_to_ordinal',
+                    'transform_sales_to_log_of_sales', 'fix_skewness',
+                    'remove_under_represented_features']
 fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
+dynamic_feature_selection_functions = ['remove_under_represented_features']
 
 for fe_function in all_fe_functions:
-    clean_train = globals()[fe_function](clean_train)
-    if fe_function not in fe_functions_only_for_training_set:
-        clean_test = globals()[fe_function](clean_test)
+    if fe_function in dynamic_feature_selection_functions:
+        # some functions remove features dynamically, we need to apply the same changes to the test data set
+        remaining_features, clean_train = globals()[fe_function](clean_train)
+        remaining_features.remove('SalePrice')
+        clean_test = clean_test[remaining_features]
+
+    else:
+        clean_train = globals()[fe_function](clean_train)
+        if fe_function not in fe_functions_only_for_training_set:
+            clean_test = globals()[fe_function](clean_test)
 
 # Save the feature engineered data
 clean_train.to_csv('training_FE_data.csv')
