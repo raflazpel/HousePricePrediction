@@ -93,24 +93,30 @@ def merge_one_hot_encoded_columns(train_df, test_df):
 
 def sum_SF(df):
     columns_to_add = ['1stFlrSF', '2ndFlrSF', 'BsmtFinSF1', 'BsmtFinSF2']
-    df['House_SF'] = df[columns_to_add].sum(axis=1)
-    df.drop(columns_to_add, axis=1, inplace=True)
+    if pd.Series(columns_to_add).isin(df.columns).all():
+        df['House_SF'] = df[columns_to_add].sum(axis=1)
+        df.drop(columns_to_add, axis=1, inplace=True)
     return df
 
 
 def sum_Baths(df):
-    df['Total_Baths'] = (df['FullBath'] + 
-                         df['BsmtFullBath'] + 
-                         (0.8*df['HalfBath']) + 
-                         (0.8*df['BsmtHalfBath']))
-    df.drop(['FullBath', 'HalfBath', 'BsmtFullBath', 'BsmtHalfBath'], axis=1,inplace = True)
+    bath_features = ['FullBath', 'HalfBath', 'BsmtFullBath', 'BsmtHalfBath']
+    if pd.Series(bath_features).isin(df.columns).all():
+        df['Total_Baths'] = (df['FullBath'] +
+                             df['BsmtFullBath'] +
+                             (0.8*df['HalfBath']) +
+                             (0.8*df['BsmtHalfBath']))
+        df.drop(bath_features, axis=1,inplace = True)
     return df
+
 
 def sum_Porch(df):
     columns_to_add = ['OpenPorchSF','3SsnPorch','EnclosedPorch','ScreenPorch','WoodDeckSF']
-    df['Porch_sf'] = df[columns_to_add].sum(axis=1)
-    df.drop(columns_to_add, axis=1,inplace=True)
+    if pd.Series(columns_to_add).isin(df.columns).all():
+        df['Porch_sf'] = df[columns_to_add].sum(axis=1)
+        df.drop(columns_to_add, axis=1,inplace=True)
     return df
+
 
 def feature_skewness(df):
     numeric_dtypes = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
@@ -140,7 +146,7 @@ def drop_empty_features(df):
     """
     Drop features 'Alley', 'PoolQC', 'Fence' and 'MiscFeature', which are almost empty
     """
-    df.drop(['Alley', 'PoolQC', 'Fence', 'MiscFeature'], axis=1, inplace=True)
+    df.drop(['Alley', 'PoolQC', 'Fence', 'MiscFeature'], axis=1, inplace=True, errors='ignore')
     return df
 
 
@@ -151,7 +157,7 @@ def drop_categories(df):
         if categoricalVariable not in ['ExterQual_Ex', 'ExterQual_Gd', 'ExterQual_TA', 'ExterQual_Fa', 'ExterQual_Po',
                                        'KitchenQual_Ex', 'KitchenQual_Gd', 'KitchenQual_TA', 'KitchenQual_Fa',
                                        'KitchenQual_Po']:
-            df.drop([categoricalVariable], axis=1, inplace=True)
+            df.drop([categoricalVariable], axis=1, inplace=True, errors='ignore')
 
     return df
 
