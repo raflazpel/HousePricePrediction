@@ -16,7 +16,7 @@ import pandas as pd
 import datetime as datetime
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_selection import SelectKBest, f_regression
 from scipy.stats import skew
 from scipy.special import boxcox1p
@@ -353,16 +353,18 @@ for number_functions_to_run in range(1, len(all_fe_functions) + 1):
 
         X = clean_train.loc[:, clean_train.columns != 'SalePrice']
         y = clean_train.loc[:, 'SalePrice']
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
+        #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
         # Create linear regression object
-        regr = linear_model.LinearRegression(n_jobs=1)
+        regr = linear_model.LinearRegression()
 
-        regr.fit(X_train, y_train)
-        y_pred = regr.predict(X_test)
+        #regr.fit(X_train, y_train)
+        #y_pred = regr.predict(X_test)
 
         # The metrics
-        score = r2_score(y_test, y_pred)
+        #score = r2_score(y_test, y_pred)
+        scores = cross_val_score(regr, X, y, cv=5)
+        score = scores.mean()
 
         # print(stats.describe(regr.coef_))
         # mse = mean_squared_error(y_test, y_pred)
