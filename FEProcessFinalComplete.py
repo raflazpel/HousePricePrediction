@@ -213,7 +213,11 @@ def add_years_since_last_remodel(df):
 
 
 def remove_too_cheap_outliers(df):
-    return df[df["SalePrice"] > 50000]
+    new_df = df[df["SalePrice"] > 50000]
+    if new_df.shape[0] > 500:
+        return new_df
+    else:
+        return df
 
 
 def remove_garage_cars_feature(df):
@@ -311,138 +315,152 @@ dynamic_feature_selection_functions = ['remove_under_represented_features', 'fea
 
 
 # start logging results
-results = []
+all_results = []
 with open("results/results_fe.txt", "w") as results_file, open("results/errors_fe.txt", "w") as errors_file:
     results_file.write("\n **** Started logging results at {} \n".format(datetime.datetime.now()))
     errors_file.write("\n **** Started logging errors at {} \n".format(datetime.datetime.now()))
 
-for number_functions_to_run in reversed(range(1, len(all_fe_functions) + 1)):
-    for functions in combinations(all_fe_functions, number_functions_to_run):
+# FE functions forward selection
+functions_kept_per_step = 3
+functions_kept_from_previous_step = [([],None)]
+for _ in all_fe_functions:
+    functions_kept_from_current_step = []
+    while len(functions_kept_from_previous_step) > 0:
+        functions_kept = functions_kept_from_previous_step.pop()[0]
+        other_functions = set(all_fe_functions) - set(functions_kept)
+        for other_function in other_functions:
+                functions_to_evaluate = functions_kept + [other_function]
 
-        # functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel', 'sum_SF', 'sum_Porch', 'sum_Baths', 'drop_empty_features', 'remove_garage_cars_feature', 'remove_lotfrontage_feature', 'drop_categories', 'remove_too_cheap_outliers', 'categorical_to_ordinal', 'fix_skewness', 'f_regression_feature_filtering', 'feature_selection_lasso', 'remove_under_represented_features']
+                try:
+                    print("\nStarting functions {}".format(functions_to_evaluate))
+                    # Load data set
+                    train = pd.read_csv('train.csv').set_index('Id')
+                    test = pd.read_csv('test.csv').set_index('Id')
+
+                    # Allow info in bigger dataframes
+                    pd.options.display.max_info_columns = 350
+
+                    # in some cases, there are specific features that we do not want to one-hot encode
+                    skip_one_hot_encode_features = []
+                    if 'categorical_to_ordinal' in functions_to_evaluate:
+                        skip_one_hot_encode_features = ['PoolQC']
+
+
+                    # Data preparation
+                    clean_train = one_hot_encode(fill_na_values(train))
+                    clean_test = one_hot_encode(fill_na_values(test))
+                    clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
+
+                    # Feature engineering
+                    for fe_function in functions_to_evaluate:
+                        clean_train = globals()[fe_function](clean_train)
+                        if fe_function in fe_functions_only_for_training_set:
+                            continue
+                        elif fe_function in dynamic_feature_selection_functions:
+                            # some functions remove features dynamically, we need to apply the same changes to the test data set
+                            clean_test = clean_test[clean_train.drop('SalePrice', axis=1).columns]
+                        else:
+                            clean_test = globals()[fe_function](clean_test)
+
+                    # TODO uncomment
+                    # Save the feature engineered data
+                    # clean_train.to_csv('training_FE_data.csv')
+                    # clean_test.to_csv('test_FE_data.csv')
+
+                    # From here you can delete it and put it in a linear regression python file
+                    # TODO: Move rest of the code to other python file.
+
+                    X = clean_train.loc[:, clean_train.columns != 'SalePrice']
+                    y = clean_train.loc[:, 'SalePrice']
+                    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
+
+                    # Create linear regression object
+                    regr = linear_model.LinearRegression()
+
+                    #regr.fit(X_train, y_train)
+                    #y_pred = regr.predict(X_test)
+
+                    # The metrics
+                    #score = r2_score(y_test, y_pred)
+                    scores = [0]
+                    try:
+                        scores = cross_val_score(regr, X, y, cv=5, n_jobs=-1)
+                    except Exception as e:
+                        with open("results/errors_fe.txt", "a") as errors_file:
+                            print("\n\n **** ERROR {0} in function : {1}, executing functions: {2}".format(e, fe_function, functions_to_evaluate))
+                            errors_file.write("Function " + str(fe_function))
+                            errors_file.write("\nfunctions " + str(functions_to_evaluate) + "\n")
+                            errors_file.write("error: " + str(e))
+                        continue
+
+                    score = scores.mean()
+
+                    #if we haven't yet kept 3 sets of functions in this step, or this score is better than the third set kept
+                    if len(functions_kept_from_current_step) < functions_kept_per_step:
+                        functions_kept_from_current_step.append((functions_to_evaluate, score))
+                    elif score > functions_kept_from_current_step[2][1]:
+                        functions_kept_from_current_step[2] = (functions_to_evaluate, score)
+                    functions_kept_from_current_step.sort(key=lambda tup: tup[1], reverse=True)
 
 
 
-        try:
-            print("\nStarting functions {}".format(functions))
-            # Load data set
-            train = pd.read_csv('train.csv').set_index('Id')
-            test = pd.read_csv('test.csv').set_index('Id')
+                    # print(stats.describe(regr.coef_))
+                    # mse = mean_squared_error(y_test, y_pred)
+                    # rmse = np.sqrt(mean_squared_error(np.log(y_test), np.log(y_pred)))
+                    # r2 = r2_score(np.log(y_test), np.log(y_pred))
+                    # print(" FUNCTIONS : {}".format(functions))
+                    # print(" sklearn score: {}".format(regr.score(X_test, y_test)))
+                    # print("r2 {}".format(r2))
+                    # print("rmse {}".format(rmse))
 
-            # Allow info in bigger dataframes
-            pd.options.display.max_info_columns = 350
+                    # keep track of results so far
+                    string_result = "functions : {0}, r^2 score; {1}".format(functions_to_evaluate, score)
+                    print("\n")
+                    print(string_result)
+                    with open("results/results_fe.txt", "a") as results_file:
+                        results_file.write(string_result + "\n")
+                    all_results.append((functions_to_evaluate, score))
+                    all_results.sort(key=lambda tup: tup[1], reverse=True)
+                    with open("results/sorted_results_fe.txt", "w") as results_file:
+                        results_file.write("Sorted result at ")
+                        results_file.write(str(datetime.datetime.now()))
+                        results_file.write("\n")
+                        for result in all_results:
+                            results_file.write(str(result) + "\n")
 
-            # in some cases, there are specific features that we do not want to one-hot encode
-            skip_one_hot_encode_features = []
-            if 'categorical_to_ordinal' in functions:
-                skip_one_hot_encode_features = ['PoolQC']
+                        #file.write(" Sorted result at { }".format(datetime.datetime.now()))
+                        #file.write(str(results))
 
 
-            # Data preparation
-            clean_train = one_hot_encode(fill_na_values(train))
-            clean_test = one_hot_encode(fill_na_values(test))
-            clean_train, clean_test = merge_one_hot_encoded_columns(clean_train, clean_test)
-
-            # Feature engineering
-            for fe_function in functions:
-                clean_train = globals()[fe_function](clean_train)
-                if fe_function in fe_functions_only_for_training_set:
+                    # TODO remove this continue (by now, don't want to predict for kaggle yet)
                     continue
-                elif fe_function in dynamic_feature_selection_functions:
-                    # some functions remove features dynamically, we need to apply the same changes to the test data set
-                    clean_test = clean_test[clean_train.drop('SalePrice', axis=1).columns]
-                else:
-                    clean_test = globals()[fe_function](clean_test)
+                    # Reentrenar con datos de validacion y cargar en csv
+                    regr2 = linear_model.LinearRegression()
+                    regr2.fit(X, y)
+                    '''
+                    test_prediction = regr2.predict(clean_test)
+                    clean_test['SalePrice'] = test_prediction
+            
+            
+                    submission = clean_test[['SalePrice']]
+                    submission.to_csv('Submission9-RETRAINED.csv')
+                    print(submission)
+            
+                    '''
+                    test_prediction = regr.predict(clean_test)
 
-            # TODO uncomment
-            # Save the feature engineered data
-            # clean_train.to_csv('training_FE_data.csv')
-            # clean_test.to_csv('test_FE_data.csv')
+                    # if SalePrice has been log-transformed, we must carry out the inverse operation (exp)
+                    if 'transform_sales_to_log_of_sales' in functions_to_evaluate:
+                        test_prediction= np.expm1(test_prediction)
 
-            # From here you can delete it and put it in a linear regression python file
-            # TODO: Move rest of the code to other python file.
+                    clean_test['SalePrice'] = test_prediction
 
-            X = clean_train.loc[:, clean_train.columns != 'SalePrice']
-            y = clean_train.loc[:, 'SalePrice']
-            #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
-
-            # Create linear regression object
-            regr = linear_model.LinearRegression()
-
-            #regr.fit(X_train, y_train)
-            #y_pred = regr.predict(X_test)
-
-            # The metrics
-            #score = r2_score(y_test, y_pred)
-            scores = [0]
-            try:
-                scores = cross_val_score(regr, X, y, cv=5, n_jobs=-1)
-            except Exception as e:
-                with open("results/errors_fe.txt", "a") as errors_file:
-                    print("\n\n **** ERROR {0} in function : {1}, executing functions: {2}".format(e, fe_function, functions))
-                    errors_file.write("Function " + str(fe_function))
-                    errors_file.write("\nfunctions " + str(functions) + "\n")
-                    errors_file.write("error: " + str(e))
-                continue
-
-            score = scores.mean()
-
-            # print(stats.describe(regr.coef_))
-            # mse = mean_squared_error(y_test, y_pred)
-            # rmse = np.sqrt(mean_squared_error(np.log(y_test), np.log(y_pred)))
-            # r2 = r2_score(np.log(y_test), np.log(y_pred))
-            # print(" FUNCTIONS : {}".format(functions))
-            # print(" sklearn score: {}".format(regr.score(X_test, y_test)))
-            # print("r2 {}".format(r2))
-            # print("rmse {}".format(rmse))
-
-            # keep track of results so far
-            string_result = "functions : {0}, r^2 score; {1}".format(functions, score)
-            print("\n")
-            print(string_result)
-            with open("results/results_fe.txt", "a") as results_file:
-                results_file.write(string_result + "\n")
-            results.append((functions, score))
-            results.sort(key=lambda tup: tup[1], reverse=True)
-            with open("results/sorted_results_fe.txt", "w") as results_file:
-                results_file.write("Sorted result at ")
-                results_file.write(str(datetime.datetime.now()))
-                results_file.write("\n")
-                for result in results:
-                    results_file.write(str(result) + "\n")
-
-                #file.write(" Sorted result at { }".format(datetime.datetime.now()))
-                #file.write(str(results))
-
-
-            # TODO remove this continue (by now, don't want to predict for kaggle yet)
-            continue
-            # Reentrenar con datos de validacion y cargar en csv
-            regr2 = linear_model.LinearRegression()
-            regr2.fit(X, y)
-            '''
-            test_prediction = regr2.predict(clean_test)
-            clean_test['SalePrice'] = test_prediction
-    
-    
-            submission = clean_test[['SalePrice']]
-            submission.to_csv('Submission9-RETRAINED.csv')
-            print(submission)
-    
-            '''
-            test_prediction = regr.predict(clean_test)
-
-            # if SalePrice has been log-transformed, we must carry out the inverse operation (exp)
-            if 'transform_sales_to_log_of_sales' in functions:
-                test_prediction= np.expm1(test_prediction)
-
-            clean_test['SalePrice'] = test_prediction
-
-            submission = clean_test[['SalePrice']]
-            submission.to_csv('FirstGroupSubmission.csv')
-        except Exception as e:
-            with open("results/errors_fe.txt", "a") as errors_file:
-                print("\n\n **** ERROR : {}".format(e))
-                errors_file.write("\nfunctions " + str(functions) + "\n")
-                errors_file.write("error: " + str(e))
+                    submission = clean_test[['SalePrice']]
+                    submission.to_csv('FirstGroupSubmission.csv')
+                except Exception as e:
+                    with open("results/errors_fe.txt", "a") as errors_file:
+                        print("\n\n **** ERROR : {}".format(e))
+                        errors_file.write("\nfunctions " + str(functions_to_evaluate) + "\n")
+                        errors_file.write("error: " + str(e))
+    functions_kept_from_previous_step = functions_kept_from_current_step
 exit(0)
