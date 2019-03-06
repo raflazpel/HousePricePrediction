@@ -18,6 +18,7 @@ from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn import ensemble
 from scipy.stats import skew
 from scipy.special import boxcox1p
 from scipy.stats import boxcox_normmax
@@ -307,8 +308,9 @@ all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'a
                     'drop_empty_features', 'remove_garage_cars_feature', 'remove_lotfrontage_feature', 'drop_categories',
                     'remove_too_cheap_outliers',
                     'categorical_to_ordinal',
-                    'transform_sales_to_log_of_sales', 'fix_skewness',
+                    'transform_sales_to_log_of_sales',
                     'f_regression_feature_filtering', 'feature_selection_lasso', 'remove_under_represented_features']
+    # 'fix_skewness',
 fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
 dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso',
                                        'f_regression_feature_filtering']
@@ -375,7 +377,8 @@ for _ in all_fe_functions:
                     #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
                     # Create linear regression object
-                    regr = linear_model.LinearRegression()
+                    #regr = linear_model.LinearRegression()
+                    regr = ensemble.GradientBoostingRegressor()
 
                     #regr.fit(X_train, y_train)
                     #y_pred = regr.predict(X_test)
