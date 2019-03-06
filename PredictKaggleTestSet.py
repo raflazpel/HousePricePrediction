@@ -13,15 +13,10 @@
 # Import necessary packages.
 import numpy as np
 import pandas as pd
-import datetime as datetime
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import SelectKBest, f_regression
 from scipy.stats import skew
-from scipy.special import boxcox1p
-from scipy.stats import boxcox_normmax
-from itertools import combinations
 
 ############################
 # DATA PREPARATION FUNCTIONS
@@ -132,19 +127,6 @@ def feature_skewness(df):
     feature_skew = df[numeric_features].apply(lambda x: skew(x)).sort_values(ascending=False)
     skews = pd.DataFrame({'skew':feature_skew})
     return feature_skew, numeric_features
-
-
-def fix_skewness(df):
-    feature_skew, numeric_features = feature_skewness(df)
-    high_skew = feature_skew[feature_skew > 0.9]
-    skew_index = high_skew.index
-    for i in skew_index:
-        df[i] = boxcox1p(df[i], boxcox_normmax(df[i]+1))
-
-    #skew_features = df[numeric_features].apply(lambda x: skew(x)).sort_values(ascending=False)
-    #skews = pd.DataFrame({'skew':skew_features})
-    return df
-
 
 def categorical_to_ordinal(df):
     """
@@ -306,14 +288,13 @@ all_fe_functions = ['add_expensive_neighborhood_feature', 'add_home_quality', 'a
                     'sum_SF', 'sum_Porch', 'sum_Baths',
                     'drop_empty_features', 'remove_garage_cars_feature', 'remove_lotfrontage_feature', 'drop_categories',
                     'remove_too_cheap_outliers',
-                    'categorical_to_ordinal',
-                    'transform_sales_to_log_of_sales', 'fix_skewness',
+                    'categorical_to_ordinal', 'transform_sales_to_log_of_sales',
                     'f_regression_feature_filtering', 'feature_selection_lasso', 'remove_under_represented_features']
-fe_functions_only_for_training_set = ['fix_skewness', 'remove_too_cheap_outliers']
+fe_functions_only_for_training_set = ['remove_too_cheap_outliers', 'transform_sales_to_log_of_sales']
 dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso',
                                        'f_regression_feature_filtering']
 
-functions_to_use = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel', 'sum_SF', 'sum_Baths', 'drop_empty_features', 'remove_lotfrontage_feature', 'drop_categories', 'remove_too_cheap_outliers', 'categorical_to_ordinal', 'transform_sales_to_log_of_sales', 'fix_skewness']
+functions_to_use = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel', 'sum_SF', 'sum_Baths', 'drop_empty_features', 'remove_lotfrontage_feature', 'drop_categories', 'remove_too_cheap_outliers', 'categorical_to_ordinal', 'transform_sales_to_log_of_sales']
 
 # Load data set
 train = pd.read_csv('train.csv').set_index('Id')
@@ -378,9 +359,9 @@ score = scores.mean()
 string_result = "functions : {0}, r^2 score; {1}".format(functions_to_use, score)
 print("\n")
 print(string_result)
-# TODO remove this continue (by now, don't want to predict for kaggle yet)
-exit(0)
+
 # Reentrenar con datos de validacion y cargar en csv
+
 regr2 = linear_model.LinearRegression()
 regr2.fit(X, y)
 '''
@@ -393,13 +374,12 @@ submission.to_csv('Submission9-RETRAINED.csv')
 print(submission)
 
 '''
-test_prediction = regr.predict(clean_test)
+test_prediction = regr2.predict(clean_test)
 
 # if SalePrice has been log-transformed, we must carry out the inverse operation (exp)
 if 'transform_sales_to_log_of_sales' in functions_to_use:
     test_prediction = np.expm1(test_prediction)
 
 clean_test['SalePrice'] = test_prediction
-
 submission = clean_test[['SalePrice']]
 submission.to_csv('FirstGroupSubmission.csv')
