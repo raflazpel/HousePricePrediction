@@ -16,6 +16,7 @@ import pandas as pd
 from sklearn import linear_model
 from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn import ensemble
 from scipy.stats import skew
 
 ############################
@@ -294,6 +295,7 @@ fe_functions_only_for_training_set = ['remove_too_cheap_outliers', 'transform_sa
 dynamic_feature_selection_functions = ['remove_under_represented_features', 'feature_selection_lasso',
                                        'f_regression_feature_filtering']
 
+#functions_to_use = ['add_expensive_neighborhood_feature', 'transform_sales_to_log_of_sales', 'sum_Porch', 'sum_Baths', 'remove_too_cheap_outliers', 'categorical_to_ordinal']
 functions_to_use = ['add_expensive_neighborhood_feature', 'add_home_quality', 'add_years_since_last_remodel', 'sum_SF', 'sum_Baths', 'drop_empty_features', 'remove_lotfrontage_feature', 'drop_categories', 'remove_too_cheap_outliers', 'categorical_to_ordinal', 'transform_sales_to_log_of_sales']
 
 # Load data set
@@ -331,6 +333,9 @@ clean_test.to_csv('test_FE_data.csv')
 
 # From here you can delete it and put it in a linear regression python file
 # TODO: Move rest of the code to other python file.
+# we want to make sure that the data we're using correponds to the data stored in the files
+clean_train = pd.read_csv('training_FE_data.csv', index_col=0)
+clean_test = pd.read_csv('test_FE_data.csv', index_col=0)
 
 X = clean_train.loc[:, clean_train.columns != 'SalePrice']
 y = clean_train.loc[:, 'SalePrice']
@@ -338,6 +343,7 @@ y = clean_train.loc[:, 'SalePrice']
 
 # Create linear regression object
 regr = linear_model.LinearRegression()
+#regr = ensemble.GradientBoostingRegressor()
 
 # regr.fit(X_train, y_train)
 # y_pred = regr.predict(X_test)
@@ -363,6 +369,7 @@ print(string_result)
 # Reentrenar con datos de validacion y cargar en csv
 
 regr2 = linear_model.LinearRegression()
+#regr2 = ensemble.GradientBoostingRegressor()
 regr2.fit(X, y)
 '''
 test_prediction = regr2.predict(clean_test)
