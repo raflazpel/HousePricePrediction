@@ -17,6 +17,8 @@ from sklearn import linear_model
 from sklearn.model_selection import cross_val_score
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn import ensemble
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import RobustScaler
 from scipy.stats import skew
 
 ############################
@@ -342,8 +344,8 @@ y = clean_train.loc[:, 'SalePrice']
 # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
 # Create linear regression object
-regr = linear_model.LinearRegression()
-#regr = ensemble.GradientBoostingRegressor()
+regr = make_pipeline(RobustScaler(), linear_model.LinearRegression())
+#regr = make_pipeline(RobustScaler(), ensemble.GradientBoostingRegressor())
 
 # regr.fit(X_train, y_train)
 # y_pred = regr.predict(X_test)
@@ -368,8 +370,8 @@ print(string_result)
 
 # Reentrenar con datos de validacion y cargar en csv
 
-regr2 = linear_model.LinearRegression()
-#regr2 = ensemble.GradientBoostingRegressor()
+regr2 = make_pipeline(RobustScaler(), linear_model.LinearRegression())
+#regr2 = make_pipeline(RobustScaler(), ensemble.GradientBoostingRegressor())
 regr2.fit(X, y)
 '''
 test_prediction = regr2.predict(clean_test)
