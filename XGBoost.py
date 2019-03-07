@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import skew
 from collections import OrderedDict
 from sklearn.model_selection import cross_val_score
-
+import sklearn.metrics
 # Load the dataset.
 train = pd.read_csv('training_FE_data.csv', index_col=0)
 submission_set = pd.read_csv('test_FE_data.csv', index_col=0)
@@ -19,7 +19,7 @@ submission_set = pd.read_csv('test_FE_data.csv', index_col=0)
 X = train.loc[:, train.columns != 'SalePrice']
 y = train.loc[:, 'SalePrice']
 
-
+print(sorted(sklearn.metrics.SCORERS.keys()))
 #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
 best_xgb_model = xgboost.XGBRegressor(colsample_bytree=0.4,
@@ -34,7 +34,7 @@ best_xgb_model = xgboost.XGBRegressor(colsample_bytree=0.4,
                  seed=42)
 
 
-scores = cross_val_score(best_xgb_model, X, y, cv=4)
+scores = cross_val_score(best_xgb_model, X, y, cv=2, scoring='neg_mean_squared_log_error')
 print(scores)
 
 best_xgb_model.fit(X, y)

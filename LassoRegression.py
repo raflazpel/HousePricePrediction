@@ -25,7 +25,7 @@ y = train.loc[:, 'SalePrice']
 lassoreg = Lasso(normalize=True, max_iter=1e5)
 
 
-scores = cross_val_score(lassoreg, X, y, cv=4)
+scores = cross_val_score(lassoreg, X, y, cv=4,scoring='neg_mean_squared_log_error')
 print(scores)
 
 lassoreg.fit(X, y)
