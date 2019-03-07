@@ -1,0 +1,5 @@
+
+ **** Started logging errors at 2019-03-05 20:57:34.257662 
+
+functions ['fix_skewness', 'drop_categories', 'add_expensive_neighborhood_feature']
+error: 'Neighborhood_NoRidge'
